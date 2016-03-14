@@ -7,7 +7,7 @@ import sbtassembly.AssemblyPlugin.autoImport._
 
 object BuildSettings {
   val buildOrganization = "cfpb"
-  val buildVersion      = "0.0.1"
+  val buildVersion      = "1.0.0"
   val buildScalaVersion = "2.11.7"
 
   val buildSettings = Defaults.coreDefaultSettings ++
@@ -49,10 +49,12 @@ object GrasshopperBuild extends Build {
 
   val asyncDeps = Seq(async)
 
+  val mfgLabs = Seq(mfglabs)
+
     
   lazy val grasshopper = (project in file("."))
     .settings(buildSettings: _*)
-    .aggregate(geocoder, addresspoints, census, client)
+    .aggregate(geocoder, model, client, test_harness)
 
 
   lazy val elasticsearch = (project in file("elasticsearch"))
@@ -77,41 +79,6 @@ object GrasshopperBuild extends Build {
       )
     )
 
-  lazy val addresspoints = (project in file("addresspoints"))
-    .configs( IntegrationTest )
-    .settings(buildSettings: _*)
-    .settings(
-      Revolver.settings ++
-      Seq(
-        assemblyJarName in assembly := {s"grasshopper-${name.value}.jar"},
-        assemblyMergeStrategy in assembly := {
-          case "application.conf" => MergeStrategy.concat
-          case x =>
-            val oldStrategy = (assemblyMergeStrategy in assembly).value
-            oldStrategy(x)
-        },
-        libraryDependencies ++= geocodeDeps,
-        resolvers ++= repos
-      )
-    ).dependsOn(elasticsearch, metrics)
-
-  lazy val census = (project in file("census"))
-    .configs( IntegrationTest )
-    .settings(buildSettings: _*)
-    .settings(
-      Revolver.settings ++ 
-      Seq(
-        assemblyJarName in assembly := {s"grasshopper-${name.value}.jar"},
-        assemblyMergeStrategy in assembly := {
-          case "application.conf" => MergeStrategy.concat
-          case x =>
-            val oldStrategy = (assemblyMergeStrategy in assembly).value
-            oldStrategy(x)
-        },
-        libraryDependencies ++= geocodeDeps,
-        resolvers ++= repos
-      )
-    ).dependsOn(elasticsearch, metrics)
 
   lazy val client = (project in file("client"))
     .configs( IntegrationTest )
@@ -121,7 +88,7 @@ object GrasshopperBuild extends Build {
           assemblyJarName in assembly := {s"grasshopper-${name.value}.jar"},
           libraryDependencies ++= akkaHttpDeps ++ scaleDeps ++ asyncDeps
         )
-    )
+    ).dependsOn(model)
 
   lazy val geocoder = (project in file("geocoder"))
     .configs( IntegrationTest )
@@ -136,10 +103,52 @@ object GrasshopperBuild extends Build {
             val oldStrategy = (assemblyMergeStrategy in assembly).value
             oldStrategy(x)
         },
-        libraryDependencies ++= akkaHttpDeps ++ scaleDeps ++ asyncDeps ++ metricsDeps,
+        libraryDependencies ++= geocodeDeps,
         resolvers ++= repos
       )
-    ).dependsOn(client, metrics)
+    ).dependsOn(client, metrics, elasticsearch)
 
+
+  lazy val model = (project in file("model"))
+    .configs(IntegrationTest)
+    .settings(buildSettings: _*)
+    .settings(
+      Seq(
+         assemblyJarName in assembly := {s"grasshopper-${name.value}.jar"},
+         assemblyMergeStrategy in assembly := {
+          case "application.conf" => MergeStrategy.concat
+          case x =>
+            val oldStrategy = (assemblyMergeStrategy in assembly).value
+            oldStrategy(x)
+        },
+        libraryDependencies ++= jsonDeps ++ scaleDeps
+      )
+    )
+
+  // FIXME: A better solution would be to push hmda-geo to a Maven repo and import
+  //        it as a standard dependency.
+  lazy val hmdaGeo = ProjectRef(uri("git://github.com/cfpb/hmda-geo.git"), "client")
+
+  // NOTE: Use this method when referencing a locally modified version of hmda-geo 
+  //lazy val hmdaGeo = ProjectRef(file("../hmda-geo"), "client")
+
+  lazy val test_harness = (project in file("test-harness"))
+    .configs(IntegrationTest)
+    .settings(buildSettings: _*)
+    .settings(mainClass in assembly := Some("grasshopper.test.GeocoderTest"))
+    .settings(
+      Seq(
+        assemblyJarName in assembly := {s"grasshopper-${name.value}.jar"},
+        assemblyMergeStrategy in assembly := {
+          case "application.conf" => MergeStrategy.concat
+          case x =>
+            val oldStrategy = (assemblyMergeStrategy in assembly).value
+            oldStrategy(x)
+        },
+        libraryDependencies ++= akkaHttpDeps ++ scaleDeps ++ mfgLabs,
+        resolvers ++= repos
+      )
+    )
+    .dependsOn(geocoder, hmdaGeo)
 
 }

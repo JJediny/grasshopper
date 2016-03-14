@@ -15,8 +15,8 @@ import java.net.URLEncoder
 object AddressParserClient extends ServiceClient with ParserJsonProtocol {
   override val config = ConfigFactory.load()
 
-  lazy val host = Properties.envOrElse("GRASSHOPPER_PARSER_HOST", config.getString("grasshopper.client.parser.host"))
-  lazy val port = Properties.envOrElse("GRASSHOPPER_PARSER_PORT", config.getString("grasshopper.client.parser.port"))
+  lazy val host = config.getString("grasshopper.client.parser.host")
+  lazy val port = config.getString("grasshopper.client.parser.port")
 
   def status: Future[Either[ResponseError, ParserStatus]] = {
     implicit val ec: ExecutionContext = system.dispatcher
@@ -28,9 +28,12 @@ object AddressParserClient extends ServiceClient with ParserJsonProtocol {
     }
   }
 
-  def standardize(address: String): Future[Either[ResponseError, ParsedAddress]] = {
+  def parse(addressString: String): Future[Either[ResponseError, ParsedAddress]] = {
     implicit val ec: ExecutionContext = system.dispatcher
-    val url = s"/standardize?address=${URLEncoder.encode(address, "UTF-8")}"
+
+    //FIXME: Use a URL builder, and don't hard-code profile
+    val encodedAddress = URLEncoder.encode(addressString, "UTF-8")
+    val url = s"/parse?profile=grasshopper&address=$encodedAddress"
     sendGetRequest(url).flatMap { response =>
       response.status match {
         case OK => Unmarshal(response.entity).to[ParsedAddress].map(Right(_))

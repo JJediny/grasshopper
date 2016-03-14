@@ -16,7 +16,7 @@ Using Elasticsearch and a fabric of high value data, this project offers an API 
 
 Why We Wanted to Solve It
 -------------------------
-Our goal is to reduce burden for financial institutions who need to report location information.  This project was built in order to establish a federal authoritative function for mortgage market needs.  In particular, the Consumer Financial Protection Bureau has elected to provide a geocoding service for those financial institutions which need to establish location attributes in order to meet regulatory functions for rules like [Qualified Mortgage](link) and [Home Mortgage Disclosure Act](link) rules.  These rules require financial institutions to report data on mortgage activities for these financial institutions, and this service offers an authoritative function to meet this need.
+Our goal is to reduce burden for financial institutions who need to report location information.  This project was built in order to establish a federal authoritative function for mortgage market needs.  In particular, the Consumer Financial Protection Bureau has elected to provide a geocoding service for those financial institutions which need to establish location attributes in order to meet regulatory functions for rules like _Qualified Mortgage_ and _Home Mortgage Disclosure Act_ rules.  These rules require financial institutions to report data on mortgage activities for these financial institutions, and this service offers an authoritative function to meet this need.
 
 We also noticed a gap in approaches to traditional geocoding and wanted to allow an opportunity for growth in the technology around this area.  Many federal, state and local entities have generic needs for geocoding, which this service may help provide.  Many traditional geocoding services hamper government use with a) inflexible terms and conditions (e.g. share alike clauses), b) proprietary technology requiring continuous licensing and/or c) in-ability to use local more relavent data for the search
 
@@ -28,7 +28,7 @@ We encourage forking, adding to the code base and/or general use of the service.
 ### Java 8 JDK
 Grasshopper's service layer runs on the Java Virtual Machine (JVM), and requires the Java 8 JDK to build and run the project.
 This project is currenly being built and tested on [Oracle JDK 8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html).
-See [Oracle's JDK Install Overview](http://docs.oracle.com/javase/8/docs/technotes/guides/install/install_overview.html) 
+See [Oracle's JDK Install Overview](http://docs.oracle.com/javase/8/docs/technotes/guides/install/install_overview.html)
 for install instructions.
 
 Grasshopper _should_ also run on OpenJDK 8.
@@ -49,7 +49,7 @@ For non-dev environments, you'll want a dedicated Elasticsearch instance.
 
 
 ## Building & Running
-Grasshopper uses [sbt's multi-project builds](http://www.scala-sbt.org/0.13/tutorial/Multi-Project.html), 
+Grasshopper uses [sbt's multi-project builds](http://www.scala-sbt.org/0.13/tutorial/Multi-Project.html),
 each project representing a specific task and usually a [Microservice](http://en.wikipedia.org/wiki/Microservices).
 
 ### Interactive
@@ -62,37 +62,51 @@ each project representing a specific task and usually a [Microservice](http://en
 
         > projects
         [info] In file:/Users/keelerh/Projects/grasshopper/
-        [info]       addresspoints
-        [info]       census
-        [info]       client
-        [info]       elasticsearch
-        [info]       geocoder
-        [info]     * grasshopper
+        [info]     client
+        [info]     elasticsearch
+        [info]     geocoder
+        [info]   * grasshopper
+        [info]     metrics
+        [info]     model
 
-        > project addresspoints
-        [info] Set current project to addresspoints (in build file: /path/to/grasshopper/)
+        > project geocoder
+        [info] Set current project to geocoder (in build file: /path/to/geocoder/)
 
 1. Start the service
 
-    This will retrieve all necessary dependencies, compile Scala source, and
-    start a local server.  It also listens for changes to underlying
-    source code, and auto-deploys to local server.
+This will retrieve all necessary dependencies, compile Scala source, and start a local server.  It also listens for changes to underlying source code, and auto-deploys to local server.
 
         > ~re-start
 
-1. Confirm service is up by browsing to http://localhost:8081/status.
+1. Confirm service is up by browsing to http://localhost:31010.
 
 ### Docker
 
 All grasshopper services and apps can be built as [Docker](https://docs.docker.com/) images.
 [Docker Compose](https://docs.docker.com/compose/) is also used to simplify local development.
 
-**Note:** Docker is a Linux-only tool.  If you are running on Mac or Windows, you will need
-[boot2docker](http://boot2docker.io/) or a similar Docker VM setup.
+#### Docker Setup
+
+Docker is a Linux-only tool.  If you are developing on Mac or Windows, you will need
+a VM to run Docker.  Below are the steps for setting up a VirtualBox-based VM using
+[Docker Machine](https://docs.docker.com/machine/).
 
 1. Install necessary dependencies (Mac-specific):
 
-        brew install docker docker-compose boot2docker
+        brew install docker docker-compose docker-machine
+
+1. Create a Docker VM using Docker Machine, and point the Docker client to it:
+
+        docker-machine create -d virtualbox docker-vm
+        eval "$(docker-machine env docker-vm)"
+
+1. Discover the Docker Host's IP
+
+        docker-machine ip docker-vm
+
+    **Note:** This is referred to as `{{docker-host-ip}}` throughout this doc.
+
+#### Developing with Docker Compose
 
 1. Checkout all other grasshopper-related repos into the same directory as
    grasshopper.  This currently includes:
@@ -101,87 +115,61 @@ All grasshopper services and apps can be built as [Docker](https://docs.docker.c
     1. [grasshopper-parser](https://github.com/cfpb/grasshopper-parser)
     1. [grasshopper-ui](https://github.com/cfpb/grasshopper-ui)
 
+1. Assemble Scala projects into Java artifacts:
 
-1. Build grasshopper Scala artifacts:
+    cd grasshopper
+    sbt clean assembly
 
-        $ cd grasshopper
-        $ sbt clean assembly
+    **Note:** This is necessary because the `geocoder` Docker image is purely Java,
+    so the Scala code must first be compiled and packaged to run in that environment.
+    This step must be repeated with each change to the `grasshopper` project.
 
-1. To start a **development** version using only grasshopper, loader, and ui run
+1. Start all projects
 
-        $ docker-compose up -d
+        docker-compose up -d
 
-    **Note:** The `-d` option is necessary since `grasshopper-loader` is not intended to run as a service, and exits immediately.
+1. Browse to the web-based containers to confirm they're working:
 
-    Then run `cd` into the grasshopper-ui directory and run
-
-        $ grunt docker
-
-    This gives you everything you need to start development plus:
-
-    - the ability to make UI changes and refresh the browser to view them.
-    - an open port to view Elasticsearch data (9200)
-        - http://{{docker-provided-ip}}:9200/census/_search?pretty=true
-        - http://{{docker-provided-ip}}:9200/address/_search?pretty=true
-
-    To start **all** Build Docker images for all projects
-
-        $ docker-compose -f docker-compose-full.yml up -d
-
-    **Note:** If using `boot2docker`, the following with get you the  `docker-provided-ip` referenced below:
-
-        $ boot2docker ip
-
-1. The dev setup has the /test/data volume so you can place any necessary data in that directory and then load it without having to rebuild the container.
-
-        $ docker-compose run loader
-
-    And then follow the command-line instructions [from the loader repo](https://github.com/cfpb/grasshopper-loader). For example:
-
-        $ node grasshopper-loader.js -d test/data/{{path/to/your/data}}
-
-1. Browse to: http://{{docker-provided-ip}}:8080/status
-
-    If all goes as expected, you should see a message similar to the following:
-
-    ```json
-    {
-      "addressPointsStatus": {
-        "status": "OK",
-        "service": "grasshopper-addresspoints",
-        "time": "2015-06-01T22:54:31.670Z",
-        "host": "b34fd3314b3b"
-      },
-      "censusStatus": {
-        "status": "OK",
-        "service": "grasshopper-census",
-        "time": "2015-06-01T22:54:31.652Z",
-        "host": "6f479f2a0cc6"
-      },
-      "parserStatus": {
-        "status": "OK",
-        "time": "2015-06-01T22:54:31.622532+00:00",
-        "upSince": "2015-06-01T22:38:17.859000+00:00",
-        "host": "a843db3dbe8e"
-      }
-    }
-    ```
-
-    Other URLs:
-
-    - UI = http://{{docker-provided-ip}}
-    - Geocoder = http://{{docker-provided-ip}}:8080/geocode/{{address}}
-
-For more details on running via Docker, see [Docker Compose](https://docs.docker.com/compose/).
+    | Container       | URL                             |
+    |-----------------|---------------------------------|
+    | `geocoder`      | http://{{docker-host-ip}}:31010 |
+    | `parser`        | http://{{docker-host-ip}}:5000  |
+    | `ui`            | http://{{docker-host-ip}}       |
+    | `elasticsearch` | http://{{docker-host-ip}}:9200  |
 
 
-## Usage
+#### Making changes to running containers
 
-The API documentation is specified in the docs folder, i.e. [Point API](docs/point_api_spec.md)
+The `grasshopper-ui` and `grasshopper-parser` projects support auto-reload of code, so you don't have to rebuild their respective images with each code change.  `grasshopper-ui` even has a Docker-specific Grunt task for further dev-friendliness.  This means you can make UI changes and just refresh the browser to view them.
 
-## Testing 
+    cd ../grasshopper-ui
+    grunt docker
 
-To run the tests, from the project directory: 
+The default Compose setup also mounts the local `grasshopper-loader/test/data` directory into the `grasshopper-loader` container so you can place files there and load them without having to rebuild.
+
+#### Loading address data
+
+The `grasshopper-loader` project comes with some small test data files.  You can load state address point and Census TIGER line data as follows:
+
+    docker-compose run loader ./index.js -f path/to/data.json
+    docker-compose run loader ./tiger.js -d path/to/tiger
+
+For further details on loading data, see [grasshopper-loader](https://github.com/cfpb/grasshopper-loader).
+
+
+#### Running the production-like full stack
+
+If you'd like to see the "full stack", which adds several logging and monitoring services,
+just point `docker-compose` at the "full" setup.  This will start **a lot** of containers,
+so no need to run this setup during development.
+
+    docker-compose -f docker-compose-full.yml up -d
+
+
+
+## Testing
+
+To run the tests, from the project directory:
 
 ```
 $ sbt
